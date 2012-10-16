@@ -1,0 +1,253 @@
+#lang scheme
+
+;; set (representation by list)
+;; O(n)
+(define (element-of-set? x set)
+  (cond ((null? set) false)
+        ((equal? x (car set)) true)
+        (else (element-of-set? x (cdr set)))))
+;; O(n)
+(define (adjoin-set x set)
+  (if (element-of-set? x set)
+      set
+      (cons x set)))
+;; O(n^2)
+(define (intersection-set set1 set2)
+  (cond ((or (null? set1) (null? set2)) '())
+        ((element-of-set? (car set1) set2)
+         (cons (car set1)
+               (intersection-set (cdr set1) set2)))
+        (else (intersection-set (cdr set1) set2))))
+
+;;ex 2.59
+(define (union-set set1 set2)
+  (cond ((or (null? set1) (null? set2))
+         (list set1 set2))
+        (else (union-set (cdr set1) (adjoin-set (car set1) set2)))))
+
+;; sorted set
+(define (element-of-sorted-set? x set)
+  (cond ((null? set) false)
+        ((= x (car set)) true)
+        ((< x (car set)) false)
+        (else (element-of-set? x (cdr set)))))
+
+(define (intersection-sorted-set set1 set2)
+  (if (or (null? set1) (null? set2))
+      '()
+      (let ((x1 (car set1)) (x2 (car set2)))
+        (cond ((= x1 x2)
+               (cons x1 (intersection-sorted-set (cdr set1) (cdr set2))))
+              ((< x1 x2) (intersection-sorted-set (cdr set1) set2))
+              ((> x1 x2) (intersection-sorted-set set1 (cdr set2)))))))
+;; 2.61
+(define (adjoin-sorted-set x set)
+  (if (null? set)
+      (list x)
+      (let ((x1 (car set)))
+        (cond ((< x x1)
+               (cons x set))
+              ((= x x1)
+               set)
+              (else (cons (car set) (adjoin-sorted-set x (cdr set))))))))
+
+;;2.62
+(define (union-sorted-set set1 set2)
+  (if (or (null? set1) (null? set2))
+      (append set1 set2)
+      (let ((x1 (car set1)) (x2 (car set2)))
+        ((= x1 x2) (cons x1 (union-sorted-set (cdr set1) (cdr set2))))
+        ((> x1 x2) (cons x2 (union-sorted-set set1 (cdr set2))))
+        ((< x1 x2) (cons x2 (union-sorted-set (cdr set1) set2))))))
+;; representation by binary tree    
+(define (entry tree) (car tree))
+(define (left-branch tree) (cadr tree))
+(define (right-branch tree) (caddr tree))
+(define (make-tree entry left right)
+  (list entry left right))
+
+(define (element-of-tree-set? x set)
+  ((cond ((null? set) false)
+         ((= x (entry set)) true)
+         ((< x (entry set))
+          (element-of-tree-set? x (left-branch set)))
+         ((> x (entry set))
+          (element-of-tree-set? x (right-branch set))))))
+
+(define (adjoin-tree-set x set)
+  (cond ((null? set) (make-tree x '() '()))
+        ((= x (entry set)) set)
+        ((< x (entry set))
+         (make-tree (entry set)
+                    (adjoin-tree-set x (left-branch set))
+                    (right-branch set))
+         ((> x (entry set))
+          (make-tree (entry set)
+                     (left-branch set)
+                     (adjoin-tree-set x (right-branch set)))))))
+;; ex 2.63
+(define (tree->list-1 tree)
+  (if (null? tree)
+      '()
+      (append (tree->list-1 (left-branch tree))
+              (cons (entry tree)
+                    (tree->list-1 (right-branch tree))))))
+(define (tree->list-2 tree)
+  (define (copy-to-list tree result-list)
+    (if (null? tree)
+        result-list
+        (copy-to-list (left-branch tree)
+                      (cons (entry tree)
+                            (copy-to-list (right-branch tree)
+                                          result-list)))))
+  (copy-to-list tree '()))
+
+;; ex 2.64
+(define (list->tree elements)
+  (car (partial-tree elements (length elements))))
+
+(define (partial-tree elts n)
+  (if (= n 0)
+      (cons '() elts)
+      (let ((left-size (quotient (- n 1) 2)))
+        (let ((left-result (partial-tree elts left-size)))
+          (let ((left-tree (car left-result))
+                (non-left-elts (cdr left-result))
+                (right-size (- n (+ left-size 1))))
+            (let ((this-entry (car non-left-elts))
+                  (right-result (partial-tree (cdr non-left-elts)
+                                              right-size)))
+              (let ((right-tree (car right-result))
+                    (remaining-elts (cdr right-result)))
+                (cons (make-tree this-entry left-tree right-tree)
+                      remaining-elts))))))))
+
+;; ex 2.65
+
+(define (union-set-tree set1 set2)
+  (define (union-set-list set1 set2)
+    (cond ((null? set1) set2)
+          ((null? set2) set1)
+          ((= (car set1) (car set2))
+           (cons (car set1) (union-set (cdr set1) (cdr set2))))
+          ((> (car set1) (car set2))
+           (cons (car set2) (union-set set1 (cdr set2))))
+          ((< (car set1) (car set2))
+           (cons (car set2) (union-set set1 (cdr set2))))))
+  (list->tree (union-set-list (tree->list-1 set1) (tree->list-1 set2))))
+
+    
+  (define (intersection-set-tree set1 set2)
+    (define (intersection-set-list set1 set2)
+      (cond ((or (null? set1) (null? set2)) '())
+            ((= (car set1) (car set2))
+             (cons (car set1) (intersection-set-list (cdr set1) (cdr set2))))
+            ((> (car set1) (car set2))
+             (intersection-set-list set1 (cdr set2)))
+            ((< (car set1) (car set2))
+             (intersection-set-list (cdr set1) set2))))
+    (list->tree (intersection-set-list (tree->list-2 set1) (tree->list-1 set2))))
+
+;; key - > value
+  (define (key item)
+    (car item))
+  (define (lookup given-key set-of-records)
+    (cond ((null? set-of-records) false)
+          ((equal? given-key (key (car set-of-records)))
+           (car set-of-records))
+          (else (lookup given-key (cdr set-of-records)))))
+  
+;; ex 2.66
+(define (lookup-binary-tree given-key tree)
+  (cond ((null? tree) false)
+        ((equal? given-key (key (entry tree)))
+         (entry tree))
+        ((> given-key (key (entry tree)))
+         (lookup-binary-tree given-key (left-branch tree)))
+        ((< given-key (key (entry tree)))
+         (lookup-binary-tree given-key (right-branch tree)))))
+
+;; Huffman 
+(define (make-leaf symbol weight)
+  (list 'leaf symbol weight))
+(define (leaf? object)
+  (eq? (car object) 'leaf))
+(define (symbol-leaf x)
+  (cadr x))
+(define (weight-leaf x)
+  (caddr x))
+
+(define (make-code-tree left right)
+  (list left
+        right
+        (append (symbols left) (symbols right))
+        (+ (weight left) (weight right))))
+(define (left-branch-h tree) (car tree))
+(define (right-branch-h tree) (cadr tree))
+(define (symbols tree)
+  (if (leaf? tree)
+      (list (symbol-leaf tree))
+      (caddr tree)))
+
+(define (weight tree)
+  (if (leaf? tree)
+      (weight-leaf tree)
+      (cadddr tree)))
+
+(define (decode bits tree)
+  (define (decode-1 bits current-branch)
+    (if (null? bits)
+        '()
+        (let ((next-branch 
+               (choose-branch (car bits) current-branch)))
+          (if (leaf? next-branch)
+              (cons (symbol-leaf next-branch)
+                    (decode-1 (cdr bits) tree))
+              (decode-1 (cdr bits) next-branch)))))
+  (decode-1 bits tree))
+
+(define (choose-branch bit branch)
+  (cond ((= bit 0) (left-branch-h branch))
+        ((= bit 1) (right-branch-h branch))
+        (else (error "bad bit -- CHOOSE-BRANCH" bit))))
+
+(define (adjoin-set-h x set)
+  (cond ((null? set) (list x))
+        ((< (weight x) (weight (car set))) (cons x set))
+        (else (cons (car set)
+                    (adjoin-set-h x (cdr set))))))
+
+(define (make-leaf-set pairs)
+  (if (null? pairs)
+      '()
+      (let ((pair (car pairs)))
+        (adjoin-set-h (make-leaf (car pair)
+                                 (cadr pair))
+                      (make-leaf-set (cdr pairs))))))
+
+;; ex 2.67
+(define sample-tree
+  (make-code-tree (make-leaf 'A 4)
+                  (make-code-tree 
+                   (make-leaf 'B 2)
+                   (make-code-tree (make-leaf 'D 1)
+                                   (make-leaf 'C 1)))))
+(define sample-message '(0 1 1 0 0 1 0 1 0 1 1 1 0))
+(decode sample-message sample-tree)
+
+;; ex 
+(define 
+
+
+
+            
+
+
+
+
+          
+
+          
+               
+               
+
