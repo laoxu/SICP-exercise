@@ -296,9 +296,3 @@
       (display object)))
 (driver-loop)
 
-
-  
-  
-  
-  
-  
